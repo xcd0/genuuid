@@ -5,8 +5,8 @@ UUIDを生成する。
 
 ```sh
 $ ./genuuid -h
-Usage: genuuid [--gen-version NUM] [--ulid] [--xid] [--win] [--lower] [--upper] [--output OUT] [--v2-domain DOMAIN] [--v2-id ID] [--namespace UUID] [--data DATA] [
---version] [--debug] [NUM [NUM ...]]
+Usage: genuuid [--gen-version NUM] [--ulid] [--xid] [--ns-uuid STR] [--win] [--lower] [--upper] [--output OUT] [--v2-domain DOMAIN] [--v2-id ID] [--namespace UUID
+] [--data DATA] [--version] [--debug] [NUM [NUM ...]]
 
 Positional arguments:
   NUM                    生成個数。 [default: [1]]
@@ -16,9 +16,10 @@ Options:
                          生成するUUIDのバージョンを指定する。[1-7] [default: 4]
   --ulid                 ULIDを生成する。生成順でソートできるUUIDのようなもの。
   --xid                  xidを生成する。生成順でソートでき、かつURLエンコードが不要なUUIDのようなもの。
+  --ns STR, -s STR       入力文字列から一意な namespace UUID を生成する。
   --win, -w              Windowsのレジストリで使用される形式で出力する。{}で囲まれる。
-  --lower                小文字で出力する。
-  --upper                大文字で出力する。
+  --lower, -l            小文字で出力する。
+  --upper, -u            大文字で出力する。
   --output OUT, -o OUT   ファイル出力する。
   --v2-domain DOMAIN     (v2) 0,1,2のいずれかを指定する。(0:Person、1:Group、2:Org) [default: -1]
   --v2-id ID             (v2) ドメイン内でのID。PersonはUID、GroupはGIDである必要があります。Orgまたは非POSIXではidの意味は、サイトによって異なります。
@@ -27,6 +28,7 @@ Options:
   --version              このプログラムのバージョン情報を出力する。
   --debug, -d            デバッグ用。ログが詳細になる。
   --help, -h             ヘルプを出力する。
+
 ```
 
 ## 使い方
@@ -81,6 +83,14 @@ $ ./genguid.exe --xid
 ctb9058aslujrt6u2c30
 ```
 
+また、文字列から一意なUUIDv5を生成する機能がある。  
+UUIDv3とUUIDv5で必要になる名前空間用UUIDに使用できる。  
+
+```
+$ ./genuuid -s www.example.com
+2ed6657d-e927-568b-95e1-2665a8aea6a2
+```
+
 ## 生成するUUIDのバージョン
 
 `-v` で生成するUUIDのバージョンを1-7の値で指定できる。  
@@ -101,26 +111,38 @@ $ ./genuuid 3 -v 1
 dac53184-9cdb-11f0-b3a3-00155d303366
 dac53390-9cdb-11f0-b3a3-00155d303366
 dac5339a-9cdb-11f0-b3a3-00155d303366
+```
+```sh
 $ ./genuuid 3 -v 2 --v2-domain 0 --v2-id 1
 00000001-9cdc-21f0-8000-00155d303366
 00000001-9cdc-21f0-8000-00155d303366
 00000001-9cdc-21f0-8000-00155d303366
-$ ./genuuid 3 -v 3 --namespace "d78946b5-bcc7-4dc5-9dcd-6843241d53cc" --data "hoge"
-49484a0b-3559-3cb2-bb6d-e2d8b62f612e
-49484a0b-3559-3cb2-bb6d-e2d8b62f612e
-49484a0b-3559-3cb2-bb6d-e2d8b62f612e
+```
+```sh
+$ ./genuuid 3 -v 3 --namespace $(./genuuid -s www.example.com) --data "hoge"
+8c956020-60a3-3d0e-9ce0-781f312ae0a3
+8c956020-60a3-3d0e-9ce0-781f312ae0a3
+8c956020-60a3-3d0e-9ce0-781f312ae0a3
+```
+```sh
 $ ./genuuid 3 -v 4
 b66f0dde-935b-474f-8ccc-b6a481841f63
 23fef6d8-6e45-4e07-9921-51e84310dc9f
 58a084a5-ff56-4f60-b06d-75daa445ea81
-$ ./genuuid 3 -v 5 --namespace "d78946b5-bcc7-4dc5-9dcd-6843241d53cc" --data "hoge"
-f135c5dc-ff74-5392-b32f-dcce26e9573e
-f135c5dc-ff74-5392-b32f-dcce26e9573e
-f135c5dc-ff74-5392-b32f-dcce26e9573e
+```
+```sh
+$ ./genuuid 3 -v 5 --namespace $(./genuuid -s www.example.com) --data "hoge"
+3fab2887-b3cb-58b4-95cf-b42a6cb55fe5
+3fab2887-b3cb-58b4-95cf-b42a6cb55fe5
+3fab2887-b3cb-58b4-95cf-b42a6cb55fe5
+```
+```sh
 $ ./genuuid 3 -v 6
 01f09cdb-bba7-662b-8ef9-00155d303366
 01f09cdb-bba7-6828-8ef9-00155d303366
 01f09cdb-bba7-6831-8ef9-00155d303366
+```
+```sh
 $ ./genuuid 3 -v 7
 0199934b-3b18-7526-a97d-257336cb79bd
 0199934b-3b18-7535-b6b8-487f8d51d284

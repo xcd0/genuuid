@@ -67,6 +67,8 @@ func main() {
 			id = GenULID()
 		} else if args.Xid {
 			id = GenXid()
+		} else if len(args.NamespaceUUID) > 0 {
+			id = GenerateNamespaceUUID(args.NamespaceUUID).String()
 		} else if args.GenVersion == 1 {
 			id = GenUUIDv1()
 		} else if args.GenVersion == 2 {
@@ -224,6 +226,13 @@ func GenUUIDv7() string {
 	return fmt.Sprintf("%s", GenUUID(7, nil, nil, nil, nil))
 }
 
+// GenerateNamespaceUUID は入力文字列から一意な namespace UUID を生成する。
+// 内部的には UUID v5 (SHA-1) を使用する。
+func GenerateNamespaceUUID(name string) uuid.UUID {
+	namespace := uuid.NameSpaceDNS               // ベースとなる名前空間 (固定のUUIDを使用、ここではDNS用を使用)。
+	return uuid.NewSHA1(namespace, []byte(name)) // v5 UUID生成 (namespace + name)
+}
+
 func GenULID() string {
 	t := time.Now()
 	entropy := ulid.Monotonic(rand.New(rand.NewSource(t.UnixNano())), 0)
@@ -249,25 +258,21 @@ func WriteText(file, str string) {
 }
 
 type Args struct {
-	Num        []int  `arg:"positional"   help:"生成個数。" default: [1]`
-	GenVersion int    `arg:"--gen-version,-v" help:"生成するUUIDのバージョンを指定する。[1-7]" default:"4" placeholder:"NUM"`
-	Ulid       bool   `arg:"--ulid"       help:"ULIDを生成する。生成順でソートできるUUIDのようなもの。"`
-	Xid        bool   `arg:"--xid"        help:"xidを生成する。生成順でソートでき、かつURLエンコードが不要なUUIDのようなもの。"`
-	Win        bool   `arg:"-w,--win"     help:"Windowsのレジストリで使用される形式で出力する。{}で囲まれる。" default:false`
-	ToLower    bool   `arg:"--lower"      help:"小文字で出力する。" default:false`
-	ToUpper    bool   `arg:"--upper"      help:"大文字で出力する。" default:false`
-	Output     string `arg:"-o,--output"  help:"ファイル出力する。" default:"" placeholder:"OUT"`
-
-	// バージョン2用。
-	V2Domain int    `arg:"--v2-domain"  help:"(v2) 0,1,2のいずれかを指定する。(0:Person、1:Group、2:Org)" placeholder:"DOMAIN"`
-	V2Id     uint32 `arg:"--v2-id"      help:"(v2) ドメイン内でのID。PersonはUID、GroupはGIDである必要があります。Orgまたは非POSIXではidの意味は、サイトによって異なります。" placeholder:"ID"`
-
-	// バージョン3/5用。
-	V35Namespace string `arg:"--namespace" help:"(v3/v5) 名前空間。UUID文字列を指定する。" default:"" placeholder:"UUID"`
-	V35Data      string `arg:"--data"      help:"(v3/v5) データ。" default:""`
-
-	Version bool `arg:"--version" help:"このプログラムのバージョン情報を出力する。"`
-	Debug   bool `arg:"-d,--debug"      help:"デバッグ用。ログが詳細になる。"`
+	Num           []int  `arg:"positional"       help:"生成個数。" default: [1]`
+	GenVersion    int    `arg:"-v,--gen-version" help:"生成するUUIDのバージョンを指定する。[1-7]" default:"4" placeholder:"NUM"`
+	Ulid          bool   `arg:"--ulid"           help:"ULIDを生成する。生成順でソートできるUUIDのようなもの。"`
+	Xid           bool   `arg:"--xid"            help:"xidを生成する。生成順でソートでき、かつURLエンコードが不要なUUIDのようなもの。"`
+	NamespaceUUID string `arg:"-s,--ns"          help:"入力文字列から一意な namespace UUID を生成する。" placeholder:"STR"`
+	Win           bool   `arg:"-w,--win"         help:"Windowsのレジストリで使用される形式で出力する。{}で囲まれる。" default:false`
+	ToLower       bool   `arg:"-l,--lower"       help:"小文字で出力する。" default:false`
+	ToUpper       bool   `arg:"-u,--upper"       help:"大文字で出力する。" default:false`
+	Output        string `arg:"-o,--output"      help:"ファイル出力する。" default:"" placeholder:"OUT"`
+	V2Domain      int    `arg:"--v2-domain"      help:"(v2) 0,1,2のいずれかを指定する。(0:Person、1:Group、2:Org)" placeholder:"DOMAIN"`
+	V2Id          uint32 `arg:"--v2-id"          help:"(v2) ドメイン内でのID。PersonはUID、GroupはGIDである必要があります。Orgまたは非POSIXではidの意味は、サイトによって異なります。" placeholder:"ID"`
+	V35Namespace  string `arg:"--namespace"      help:"(v3/v5) 名前空間。UUID文字列を指定する。" default:"" placeholder:"UUID"`
+	V35Data       string `arg:"--data"           help:"(v3/v5) データ。" default:""`
+	Version       bool   `arg:"--version"        help:"このプログラムのバージョン情報を出力する。"`
+	Debug         bool   `arg:"-d,--debug"       help:"デバッグ用。ログが詳細になる。"`
 }
 
 type ArgsVersion struct {
@@ -279,6 +284,7 @@ func (args *Args) Print() {
 	GenVersion   : %v
 	Ulid         : %v
 	Xid          : %v
+	NamespaceUUID: %v
 	ToLower      : %v
 	ToUpper      : %v
 	Output       : %v
@@ -293,6 +299,7 @@ func (args *Args) Print() {
 		args.GenVersion,
 		args.Ulid,
 		args.Xid,
+		args.NamespaceUUID,
 		args.ToLower,
 		args.ToUpper,
 		args.Output,
@@ -329,16 +336,17 @@ func ShowVersion() {
 
 func ArgParse() *Args {
 	args := &Args{
-		Num:        []int{1}, //[]int  `arg:"positional"   help:"生成個数。" default: [1]`
-		GenVersion: 4,        //int    `arg:"-v"           help:"生成するUUIDのバージョンを指定する。[1-7]" default:4`
-		Ulid:       false,    //bool   `arg:"--ulid"       help:"ULIDを生成する。生成順でソートできるUUIDのようなもの。"`
-		Xid:        false,    //bool   `arg:"--xid"        help:"xidを生成する。生成順でソートでき、かつURLエンコードが不要なUUIDのようなもの。"`
-		Win:        false,    //bool   `arg:"-w,--win"     help:"Windowsのレジストリで使用される形式で出力する。{}で囲まれる。" default:false`
-		ToLower:    false,    //bool   `arg:"--lower"      help:"小文字で出力する。" default:false`
-		ToUpper:    false,    //bool   `arg:"--upper"      help:"大文字で出力する。" default:false`
-		Output:     "",       //string `arg:"-o,--output"  help:"ファイル出力する。"`
-		Version:    false,    //bool   `arg:"--version" help:"バージョン情報を出力する。"`
-		Debug:      false,    //bool   `arg:"-d,--debug"      help:"デバッグ用。ログが詳細になる。"`
+		Num:           []int{1}, //[]int  `arg:"positional"   help:"生成個数。" default: [1]`
+		GenVersion:    4,        //int    `arg:"-v"           help:"生成するUUIDのバージョンを指定する。[1-7]" default:4`
+		Ulid:          false,    //bool   `arg:"--ulid"       help:"ULIDを生成する。生成順でソートできるUUIDのようなもの。"`
+		Xid:           false,    //bool   `arg:"--xid"        help:"xidを生成する。生成順でソートでき、かつURLエンコードが不要なUUIDのようなもの。"`
+		NamespaceUUID: "",       //bool   `arg:"--namespace-uuid" help:"入力文字列から一意な namespace UUID を生成する。"`
+		Win:           false,    //bool   `arg:"-w,--win"     help:"Windowsのレジストリで使用される形式で出力する。{}で囲まれる。" default:false`
+		ToLower:       false,    //bool   `arg:"--lower"      help:"小文字で出力する。" default:false`
+		ToUpper:       false,    //bool   `arg:"--upper"      help:"大文字で出力する。" default:false`
+		Output:        "",       //string `arg:"-o,--output"  help:"ファイル出力する。"`
+		Version:       false,    //bool   `arg:"--version" help:"バージョン情報を出力する。"`
+		Debug:         false,    //bool   `arg:"-d,--debug"      help:"デバッグ用。ログが詳細になる。"`
 
 		// バージョン2用。
 		V2Domain: -1, // int    `arg:"--v2-domain"  help:"(v2専用) 0,1,2のいずれかを指定する。(0:Person、1:Group、2:Org)"`
